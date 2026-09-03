@@ -4,7 +4,7 @@ from data_import import data_loader
 
 class strategy:
 
-    def __init__(self, values, signals):
+    def __init__(self, values: dict, signals: dict):
         self.values = values
         self.signals = signals
 
@@ -25,7 +25,7 @@ class strategy:
 
 class multi_asset_startegy:
 
-    def __init__(self, assets_to_trade, values, signals):
+    def __init__(self, assets_to_trade: str | list, values: dict, signals: dict):
         self.values = values
         self.signals = signals
         self.assets_to_trade = assets_to_trade
@@ -38,6 +38,10 @@ class multi_asset_startegy:
 
     def calculate_signal(self, data: dict):
         self.calculate_values(data)
+        
+        if isinstance(self.assets_to_trade, str):
+            self.assets_to_trade = [self.assets_to_trade]
+
         for asset in self.assets_to_trade:
             for signal_name, f in self.signals.items():
                 data[asset][signal_name] = f(data)

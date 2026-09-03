@@ -37,17 +37,3 @@ class Metrics:
                    "Maximum Drawdown":max_drawdown, 
                    "Sharpe ratio":sharpe_ann}
         return metrics
-'''
-Data = data_loader(["AAPL", "GOOG", "NVDA"], "2023-01-01", "2025-01-01").load_data()
-Strategy = strategy(values = {
-        "sma_20": lambda row: row["Close"].rolling(window=20).mean(),
-        "sma_60": lambda row: row["Close"].rolling(window=60).mean(),
-    }, signals = {
-        "sma20<sma60": lambda row: row["sma_20"] < row["sma_60"]
-    })
-Data = Strategy.calculate_signal(Data)
-Backtest = Backtester(10000).backtest(Data)
-Test = Metrics(Backtest)
-Test.risk_free_download_join()
-Test.calculate_metrics()
-'''
