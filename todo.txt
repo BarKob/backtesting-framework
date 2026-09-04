@@ -1,4 +1,0 @@
-Better pyplot visualization
-GitHub README
-Example strategies
-Limitations & future updates
