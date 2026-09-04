@@ -1,5 +1,3 @@
-from data_import import data_loader
-from strategy import strategy
 import pandas as pd
 
 class Backtester:

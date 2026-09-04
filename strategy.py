@@ -1,7 +1,3 @@
-import pandas as pd
-
-from data_import import data_loader
-
 class strategy:
 
     def __init__(self, values: dict, signals: dict):

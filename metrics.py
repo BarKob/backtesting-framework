@@ -1,6 +1,3 @@
-from portfolio import Backtester
-from strategy import strategy
-from data_import import data_loader
 import pandas as pd
 import numpy as np
 

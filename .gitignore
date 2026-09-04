@@ -5,3 +5,4 @@ venv/
 .env
 .vscode/
 DGS3MO.csv
+portfolioPandasTest.py

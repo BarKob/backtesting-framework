@@ -23,8 +23,8 @@ metrics_text = "STRATEGY: \n" + "\n".join(f"{metric_name}:  {round(value, 2)}" f
 benchmark_metrics_text = "BENCHMARK: \n" + "\n".join(f"{metric_name}:  {round(value, 2)}" for metric_name, value in Benchmark_Final_metrics.items())
 
 axes[2].axis("off")
-axes[2].text(0.35, 0.5, metrics_text, transform = axes[2].transAxes, verticalalignment = "center")
-axes[2].text(0.65, 0.5, benchmark_metrics_text, transform = axes[2].transAxes, verticalalignment = "center")
+axes[2].text(0.3, 0.5, metrics_text, transform = axes[2].transAxes, verticalalignment = "center")
+axes[2].text(0.6, 0.5, benchmark_metrics_text, transform = axes[2].transAxes, verticalalignment = "center")
 
 plt.tight_layout()
 plt.show()

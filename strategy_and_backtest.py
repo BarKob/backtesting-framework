@@ -2,7 +2,7 @@ from portfolio import Backtester
 from strategy import strategy, multi_asset_startegy
 from data_import import data_loader
 from metrics import Metrics
-
+import pandas as pd
 #Strategy & Backtest declaration
 
 tickers = [] # str for singular asset, list of strings for multiple assets
@@ -26,11 +26,7 @@ Benchmark_Strategy = strategy()
 '''
 EXAMPLE:
 
-tickers = [
-    "GLD",
-    "AAPL",
-    "TLT"
-]
+tickers = ["MSFT", "AAPL"]
 
 start_date = "2015-01-01"
 end_date = "2025-01-01"
@@ -38,9 +34,10 @@ benchmark = "SPY"
 starting_capital = 10000
 
 Strategy = strategy(values = {
-        "pct_change_20": lambda row: row["Close"].pct_change(20)
+        "sma_20": lambda row: row["Close"].rolling(20).mean(),
+        "sma_60": lambda row: row["Close"].rolling(60).mean()
     }, signals = {
-        "pct_change_20>0": lambda row: row["pct_change_20"] > 0
+        "sma_20 > sma_60": lambda row: row["sma_20"] > row["sma_60"]
     })
 
 Benchmark_Strategy = strategy(values = {
