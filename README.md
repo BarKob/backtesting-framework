@@ -408,7 +408,6 @@ These limitations mean that the framework should be viewed as a **research and e
 
 Potential extensions include:
 
-* Automated risk-free-rate data acquisition
 * Transaction cost and slippage modelling
 * More flexible position sizing
 * Short positions and leverage

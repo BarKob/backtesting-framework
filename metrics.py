@@ -8,7 +8,7 @@ class Metrics:
         self.daily_portfolio_values = portfolio_history["Total_Portfolio_Value"]
         self.rfr_with_portfolio_values = pd.DataFrame()
         
-    def risk_free_download_join(self, csv_source = "DGS3MO.csv"):
+    def risk_free_download_join(self, csv_source = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO"):
         risk_free_rates = pd.read_csv(csv_source, index_col = "observation_date").ffill()
         risk_free_rates.index = pd.to_datetime(risk_free_rates.index).normalize()
         risk_free_rates["DGS3MO"] = (risk_free_rates["DGS3MO"] / 100 + 1) ** (1 / 252) - 1
