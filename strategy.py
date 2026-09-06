@@ -1,3 +1,5 @@
+import pandas as pd
+
 class strategy:
 
     def __init__(self, values: dict, signals: dict):
@@ -15,11 +17,10 @@ class strategy:
         for asset in data:
             for signal_name, f in self.signals.items():
                 data[asset][signal_name] = f(data[asset])
-
             data[asset]["signal"] = data[asset][self.signals.keys()].all(axis=1)
         return data
 
-class multi_asset_startegy:
+class multi_asset_strategy:
 
     def __init__(self, assets_to_trade: str | list, values: dict, signals: dict):
         self.values = values
@@ -27,20 +28,21 @@ class multi_asset_startegy:
         self.assets_to_trade = assets_to_trade
 
     def calculate_values(self, data: dict):
-        for asset in data:
+        for asset in self.assets_to_trade:
             for value, equation in self.values.items():
-                data[asset][value] = equation(data[asset])
+                data[asset][value] = equation(data)
         return data
 
     def calculate_signal(self, data: dict):
-        self.calculate_values(data)
         
         if isinstance(self.assets_to_trade, str):
             self.assets_to_trade = [self.assets_to_trade]
 
+        self.calculate_values(data)
+
         for asset in self.assets_to_trade:
             for signal_name, f in self.signals.items():
-                data[asset][signal_name] = f(data)
+                data[asset][signal_name] = f(data[asset])
             data[asset]["signal"] = data[asset][self.signals.keys()].all(axis=1)
         data_new = {asset_name:dataframe for asset_name, dataframe in data.items() if asset_name in self.assets_to_trade}
         return data_new

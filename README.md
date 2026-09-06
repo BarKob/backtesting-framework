@@ -1,6 +1,6 @@
 # Backtesting Framework
 
-<u>A Python framework for backtesting signal-based systematic trading strategies with support for single- and multi-asset execution.</u>
+A Python framework for backtesting signal-based systematic trading strategies with support for single- and multi-asset execution.
 
 The framework was built from scratch to provide a modular environment for testing systematic trading strategies on historical market data. It separates data acquisition, strategy declaration, signal generation, portfolio execution, performance evaluation, and visualization into independent components.
 
@@ -8,7 +8,7 @@ The framework was built from scratch to provide a modular environment for testin
 
 ## Overview
 
-The framework takes historical market data, applies a user-defined trading strategy, simulates portfolio execution, and evaluates the resulting performance against a benchmark.
+The framework takes historical market data, applies user-defined trading strategies, simulates portfolio execution, and evaluates the resulting performance against a benchmark.
 
 The main workflow is:
 
@@ -30,13 +30,13 @@ Historical Market Data
  Visualization & Benchmark Comparison
 ```
 
-<u>The framework is designed in a modular way so that the framework is not tied to any strategy, the trading logic is separated from the portfolio execution and performance evaluation layers. This allows different strategies to be tested without modifying the underlying backtesting engine.</u>
+The framework is designed so that the trading strategy is independent from the backtesting engine. This allows different strategies to be tested without modifying the underlying portfolio execution or performance evaluation logic.
 
 ---
 
-## Features
+## Key Features
 
-### Strategy Definition
+### 1. Modular Strategy Interface
 
 Strategies are defined through user-provided functions for calculating derived values and generating trading signals.
 
@@ -52,60 +52,176 @@ Strategy = strategy(
 )
 ```
 
-<u>Strategy logic is decoupled from the backtesting engine through a flexible function-based interface.</u>
+<u>Strategy logic is completely separated from portfolio execution, allowing new strategies to be created without modifying the backtesting engine.</u>
 
-Multiple conditions can be combined into a final trading signal.
+The interface supports arbitrary user-defined calculations, making the framework independent of any particular trading strategy.
 
-### Single-Asset Backtesting
+---
 
-The framework supports conventional single-asset systematic strategies where trading decisions are based on the quantitative data of one asset.
+### 2. Historical Lookback Handling
 
-### Multi-Asset Backtesting
+Many systematic trading strategies require historical observations before they can generate their first valid signal.
 
-<u>The framework also supports multi-asset execution, allowing signals to be calculated using information from multiple assets and specifying which assets should actually be traded.</u>
+For example, a 200-day moving average requires 200 previous observations. A naive backtester either:
 
-This allows strategies to incorporate cross-asset information rather than restricting signals to the asset being traded.
+* starts the calculation with missing values,
+* delays the backtest until the lookback period has passed, or
+* requires the user to manually download additional historical data.
 
-For example, a strategy can use information from one asset to determine whether another asset should be traded.
+<u>This framework separates the data required to calculate a strategy's indicators from the period over which the portfolio is actually backtested.</u>
 
-### Portfolio Simulation
+The runner automatically downloads additional historical data before the requested backtest start date:
 
-The `Backtester` class simulates portfolio execution by maintaining:
+```python
+data_download_start_date = (
+    pd.to_datetime(start_date)
+    - pd.Timedelta(days=data_before_benchmark) * 2
+)
+```
+
+The indicators and signals can therefore be calculated using historical observations that precede the backtest.
+
+The resulting data is then trimmed back to the requested start date before portfolio execution.
+
+<u>This allows strategies using lagged variables, rolling statistics, and other historical-data-dependent signals to generate valid signals from the first day of the actual backtest.</u>
+
+This avoids artificially delaying strategy execution simply because the strategy needs historical observations to initialize its calculations.
+
+---
+
+### 3. Single-Asset Strategies
+
+The framework supports conventional systematic strategies where trading decisions are based on the quantitative data of an individual asset.
+
+Example:
+
+```python
+Strategy = strategy(
+    values={
+        "sma_200": lambda row: row["Close"].rolling(200).mean(),
+        "sma_50": lambda row: row["Close"].rolling(50).mean()
+    },
+    signals={
+        "sma_200 < sma_50": lambda row: row["sma_200"] < row["sma_50"]
+    }
+)
+```
+
+---
+
+### 4. Multi-Asset Strategies
+
+<u>The framework supports strategies whose signals can depend on data from multiple assets while specifying which asset should be traded.</u>
+
+For example, a strategy can compare the momentum of two assets and use the result to decide which one to hold.
+
+```python
+Strategy1 = multi_asset_startegy(
+    "MSFT",
+    values={
+        "AAPL_pct_change_60": lambda data: data["AAPL"]["Close"].pct_change(20),
+        "MSFT_pct_change_60": lambda data: data["MSFT"]["Close"].pct_change(20)
+    },
+    signals={
+        "MSFT<AAPL_pctc60":
+            lambda row: row["MSFT_pct_change_60"] < row["AAPL_pct_change_60"]
+    }
+)
+```
+
+The signal-generation layer can therefore access information outside the asset being traded.
+
+<u>This creates a separation between the assets used as information sources and the assets on which trades are executed.</u>
+
+This enables strategies such as:
+
+* Relative momentum
+* Cross-asset signals
+* Asset selection
+* Market-regime signals
+* Relative-value-style rules
+
+---
+
+### 5. Strategy Composition
+
+<u>Multiple independently defined strategies can be combined into a single backtest.</u>
+
+Strategies can be placed into a list:
+
+```python
+Strategy = [Strategy1, Strategy2]
+```
+
+The backtest runner processes each strategy and combines the resulting tradable assets into the portfolio.
+
+This allows complex portfolios to be constructed from simpler strategy components rather than requiring one large monolithic strategy definition.
+
+---
+
+### 6. Portfolio Simulation
+
+The `Backtester` class simulates portfolio execution while maintaining:
 
 * Cash
 * Shares owned
-* Asset value
+* Shares value
 * Total portfolio value
 
-<u>For multi-asset portfolios, the framework allocates the initial capital across the selected assets and aggregates their individual daily portfolio values into a total portfolio value series.</u>
+For multiple assets, the initial capital is divided between the selected assets and the resulting daily portfolio values are aggregated into a total portfolio value series.
 
-### Benchmark Comparison
+<u>Portfolio execution is kept separate from signal generation, so the same execution engine can be reused across different strategies.</u>
 
-<u>Strategy performance can be evaluated against a separately constructed benchmark strategy.</u>
+---
 
-The framework supports constructing a simple buy-and-hold benchmark using the same strategy interface.
+### 7. Benchmark Comparison
 
-This makes it possible to compare both portfolio value and performance metrics rather than evaluating a strategy in isolation.
+<u>Every strategy can be evaluated against a separately constructed benchmark using the same backtesting infrastructure.</u>
 
-### Performance Metrics
+The default benchmark is a buy-and-hold strategy:
+
+```python
+strategy(
+    values={},
+    signals={
+        "buy&hold": lambda row: True
+    }
+)
+```
+
+This allows strategy and benchmark performance to be compared using the same:
+
+* Portfolio accounting
+* Performance metrics
+* Visualization pipeline
+
+The framework therefore evaluates not only whether a strategy made money, but also how its performance compares with a passive alternative.
+
+---
+
+### 8. Performance Metrics
 
 The framework currently calculates:
 
-* Total return
-* Annualized volatility
-* Maximum drawdown
-* Annualized Sharpe ratio
+| Metric           | Description                                |
+| ---------------- | ------------------------------------------ |
+| Total Return     | Overall portfolio return over the backtest |
+| Volatility       | Annualized volatility of portfolio returns |
+| Maximum Drawdown | Largest peak-to-trough decline             |
+| Sharpe Ratio     | Annualized risk-adjusted return            |
 
-<u>The Sharpe ratio incorporates a time-varying risk-free rate based on 3-month U.S. Treasury yields rather than assuming a constant zero risk-free rate.</u>
+<u>The Sharpe ratio uses a time-varying risk-free rate based on 3-month U.S. Treasury yields rather than assuming a constant zero risk-free rate.</u>
 
-The risk-free-rate data is aligned with the portfolio's trading dates before calculating excess returns.
+The Treasury yield is converted to a daily rate and aligned with the portfolio's trading dates before excess returns are calculated.
 
-### Visualization
+---
+
+### 9. Visualization
 
 The framework generates a Matplotlib dashboard containing:
 
-* Portfolio value vs. benchmark over time
-* Individual portfolio components' value over time
+* Portfolio value vs. benchmark
+* Individual portfolio components
 * Strategy performance metrics
 * Benchmark performance metrics
 
@@ -133,11 +249,29 @@ The loader accepts either a single ticker or a list of tickers and returns the c
 
 Contains the strategy classes responsible for calculating derived values and trading signals.
 
-The standard `strategy` class is designed for signals calculated based on singular asset's data, with support for execution of a strategy on multiple assets in the same portfolio.
+The `strategy` class supports signals based on an individual asset's data, while `multi_asset_startegy` allows signals to incorporate information from multiple assets.
 
-The multi-asset strategy implementation using `multi_asset_strategy` class allows signals to incorporate information from multiple assets.
+<u>The strategy layer does not perform portfolio accounting or trade execution.</u>
 
-<u>This separation allows the same backtesting engine to be used with different trading strategies without changing the portfolio execution code.</u>
+It is responsible only for transforming market data into trading signals.
+
+---
+
+### `backtest_runner.py`
+
+Provides the high-level backtest workflow.
+
+It coordinates:
+
+1. Historical data acquisition
+2. Lookback-data preparation
+3. Strategy signal generation
+4. Backtest execution
+5. Benchmark construction
+6. Performance metric calculation
+7. Visualization
+
+<u>The runner handles the distinction between data required for indicator calculation and data belonging to the actual backtest period.</u>
 
 ---
 
@@ -154,7 +288,7 @@ The backtester is responsible for:
 5. Recording portfolio history
 6. Aggregating multi-asset portfolio values
 
-<u>The execution layer is independent of the strategy definition, making the framework reusable across different signal-generation approaches.</u>
+<u>The execution layer is independent of the strategy definition, making the portfolio engine reusable across different signal-generation approaches.</u>
 
 ---
 
@@ -162,14 +296,7 @@ The backtester is responsible for:
 
 Contains the `Metrics` class used to evaluate portfolio performance.
 
-Current metrics include:
-
-| Metric           | Description                                              |
-| ---------------- | -------------------------------------------------------- |
-| Total Return     | Overall portfolio return over the backtest               |
-| Volatility       | Annualized volatility of portfolio returns               |
-| Maximum Drawdown | Largest peak-to-trough decline                           |
-| Sharpe Ratio     | Annualized risk-adjusted return using the risk-free rate |
+The class calculates absolute and risk-adjusted performance measures and retrieves the relevant risk-free-rate data for Sharpe ratio calculation.
 
 ---
 
@@ -179,7 +306,7 @@ Produces the final performance dashboard using Matplotlib.
 
 The dashboard compares the strategy with its benchmark and displays the calculated performance statistics.
 
-<img src="images/Strategy against benchmark.png" alt="Backtesting performance dashboard" width="800">
+<img src="images/Strategy against benchmark.png" alt="Strategy compared with benchmark" width="800">
 
 ---
 
@@ -188,25 +315,80 @@ The dashboard compares the strategy with its benchmark and displays the calculat
 ```text
 backtesting-framework/
 │
+├── backtest_runner.py
 ├── data_import.py
 ├── strategy.py
 ├── portfolio.py
 ├── metrics.py
 ├── visual.py
-├── strategy_and_backtest.py
-├── DGS3MO.csv
+├── main.py
+│
+├── examples/
+│   ├── moving_average.py
+│   ├── multi_asset_trend.py
+│   └── stock_picking.py
+│
+├── images/
+│   ├── Visualization.png
+│   ├── Strategy against benchmark.png
+│   └── Metrics comparison.png
+│
 ├── requirements.txt
 ├── .gitignore
 └── README.md
 ```
 
-`strategy_and_backtest.py` serves as the main user-facing example. It contains the parameters that need to be configured before running a backtest.
+`main.py` serves as the main user-facing configuration file, while the `examples/` directory contains complete examples of different strategy types.
+
+---
+
+## Examples
+
+### Moving Average Strategy
+
+`examples/moving_average.py`
+
+A single-asset moving-average strategy using 50- and 200-day rolling averages.
+
+Demonstrates:
+
+* Custom derived values
+* Rolling-window calculations
+* Signal generation
+* Benchmark comparison
+
+---
+
+### Multi-Asset Trend Strategy
+
+`examples/multi_asset_trend.py`
+
+A multi-asset strategy comparing the relative momentum of MSFT and AAPL.
+
+Demonstrates:
+
+* Multi-asset data access
+* Cross-asset signal generation
+* Separate tradable assets
+* Strategy composition
+
+<u>This example demonstrates that the framework can distinguish between data used to generate a signal and the asset on which that signal is executed.</u>
+
+---
+
+### Stock-Picking Strategy
+
+`examples/stock_picking.py`
+
+A simple buy-and-hold strategy applied across multiple assets.
+
+Demonstrates the portfolio's ability to handle multiple assets and aggregate their values into a single portfolio-level performance series.
 
 ---
 
 ## Installation
 
-Clone the repository and navigate to the project directory:
+Clone the repository:
 
 ```bash
 git clone https://github.com/BarKob/backtesting-framework.git
@@ -225,7 +407,7 @@ Activate it on Windows:
 .venv\Scripts\Activate.ps1
 ```
 
-Install the required dependencies:
+Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -235,85 +417,54 @@ pip install -r requirements.txt
 
 ## Usage
 
-The main configuration is located in:
+The simplest way to run the framework is through `main.py`.
 
-```text
-strategy_and_backtest.py
-```
-
-The user-configurable parameters include:
+The main user-configurable parameters are:
 
 ```python
-tickers = []              # str for singular asset, list of strings for multiple assets
+tickers = []              # str for a single asset, list of strings for multiple assets
 start_date = ""           # "YYYY-MM-DD"
 end_date = ""             # "YYYY-MM-DD"
-benchmark = []            # str for singular asset, list of strings for multiple assets
+benchmark = []            # str for a single asset, list of strings for multiple assets
 starting_capital = int    # starting capital
 ```
 
-A strategy can then be defined using custom value calculations and trading signals.
+A strategy is then created using the `strategy` or `multi_asset_startegy` class.
 
 For example:
 
 ```python
 Strategy = strategy(
     values={
-        "value_name": lambda row: # Equation for a custom value based on the OHLCV data
+        "sma_20": lambda row: row["Close"].rolling(20).mean(),
+        "sma_60": lambda row: row["Close"].rolling(60).mean()
     },
     signals={
-        "signal_name": lambda row: # Statement providing True/False value
+        "sma_20 > sma_60": lambda row: row["sma_20"] > row["sma_60"]
     }
 )
 ```
 
-The framework can then be used to:
-
-```text
-1. Download historical data
-2. Calculate strategy signals
-3. Run the backtest
-4. Calculate performance metrics
-5. Compare the strategy with a benchmark
-6. Generate the performance visualization
-```
-
----
-
-## Example Strategy
-
-The framework is strategy-agnostic and does not require a specific trading strategy.
-
-A simple example is a momentum signal based on the 20-day percentage change:
+The backtest is then run through:
 
 ```python
-Strategy = strategy(
-    values={
-        "pct_change_20": lambda row: row["Close"].pct_change(20)
-    },
-    signals={
-        "pct_change_20>0": lambda row: row["pct_change_20"] > 0
-    }
+run_the_backtester(
+    tickers,
+    start_date,
+    end_date,
+    benchmark,
+    starting_capital,
+    Strategy
 )
 ```
 
-A buy-and-hold benchmark can be represented using the same interface:
-
-```python
-Benchmark_Strategy = strategy(
-    values={},
-    signals={
-        "buy&hold": lambda row: True
-    }
-)
-```
-
-<u>The benchmark is therefore evaluated through the same portfolio and performance infrastructure as the strategy rather than being treated as a separate analysis.</u>
+The framework handles data acquisition, signal generation, portfolio execution, metric calculation, and visualization automatically.
 
 ---
 
 ## Performance Evaluation
 
-The framework evaluates a strategy using both absolute and risk-adjusted measures.
+The framework evaluates strategies using both absolute and risk-adjusted measures.
 
 ### Total Return
 
@@ -325,15 +476,13 @@ The standard deviation of daily portfolio returns is annualized to provide a mea
 
 ### Maximum Drawdown
 
-Maximum drawdown measures the largest decline from a historical portfolio peak.
-
-<u>This provides a direct measure of the downside experienced during the backtest rather than relying solely on total return.</u>
+Measures the largest decline from a historical portfolio peak.
 
 ### Sharpe Ratio
 
 The annualized Sharpe ratio is calculated using portfolio excess returns over the daily risk-free rate.
 
-<u>The framework converts the 3-month Treasury yield into a daily rate and aligns the resulting series with the portfolio's trading dates.</u>
+<u>The risk-free rate is obtained from 3-month U.S. Treasury yields and converted to a daily equivalent before being aligned with the portfolio return series.</u>
 
 ---
 
@@ -341,64 +490,65 @@ The annualized Sharpe ratio is calculated using portfolio excess returns over th
 
 A strategy should not be evaluated solely on whether its portfolio value increased.
 
-The framework therefore supports explicit benchmark comparison.
+The framework therefore constructs a benchmark independently and evaluates it through the same portfolio and metrics pipeline.
 
-The benchmark can be configured independently from the strategy and its results are displayed alongside the strategy's:
+The visualization compares:
 
-* Portfolio value
-* Total return
-* Volatility
-* Maximum drawdown
-* Sharpe ratio
+* Strategy portfolio value
+* Benchmark portfolio value
+* Individual strategy components
+* Strategy metrics
+* Benchmark metrics
 
-<img src="images/Metrics comparison.png" alt="Backtesting performance dashboard" width="800">
+<img src="images/Metrics comparison.png" alt="Strategy and benchmark metrics comparison" width="800">
 
-This makes it possible to assess whether the strategy provides meaningful improvement over a passive alternative.
+This provides a more meaningful evaluation of whether a strategy adds value relative to a passive alternative.
 
 ---
 
 ## Design Principles
 
-The project was designed around several principles:
-
 ### Modularity
 
-<u>Data loading, strategy logic, portfolio execution, metrics, and visualization are implemented as separate components.</u>
+<u>Data loading, strategy logic, portfolio execution, performance metrics, and visualization are implemented as separate components.</u>
 
 ### Strategy Independence
 
-<u>The backtesting engine does not contain strategy-specific trading logic. Strategies provide signals, while the backtester handles execution.</u>
+<u>The backtesting engine does not contain strategy-specific trading logic. Strategies generate signals while the backtester handles execution.</u>
+
+### Separation of Information and Execution
+
+<u>Multi-asset strategies can use one set of assets as information sources while executing trades on another set of assets.</u>
+
+### Correct Historical Initialization
+
+<u>Strategies requiring historical observations can use data preceding the actual backtest period without artificially delaying portfolio execution.</u>
+
+### Composability
+
+<u>Multiple independently defined strategies can be combined into a single portfolio.</u>
 
 ### Extensibility
 
 New strategies can be tested by defining new value calculations and signals without modifying the core portfolio engine.
 
-### Reproducibility
-
-Backtests use explicitly specified:
-
-* Assets
-* Start date
-* End date
-* Initial capital
-* Strategy definition
-* Benchmark
-
-This makes individual experiments easier to reproduce.
-
 ---
 
 ## Current Limitations
 
-The framework is intentionally focused on the core mechanics of signal-based backtesting. It currently does not model several features present in production-grade trading systems, including:
+The framework focuses on the core mechanics of signal-based backtesting. It currently does not model several features present in production-grade trading systems, including:
 
 * Transaction costs
 * Bid-ask spreads
 * Slippage
 * Market impact
-* Position sizing beyond equal initial capital allocation
 * Short selling
 * Leverage
+* Portfolio-level risk constraints
+* Intraday execution
+* Advanced position sizing
+* Advanced order types
+* Corporate actions beyond the adjusted historical data provided by the data source
 
 These limitations mean that the framework should be viewed as a **research and educational backtesting framework rather than a production trading system**.
 
@@ -416,6 +566,8 @@ Potential extensions include:
 * Unit and integration testing
 * More sophisticated order execution models
 * Support for additional market-data providers
+* Improved experiment management
+* Automated data caching and management
 
 ---
 
@@ -431,6 +583,8 @@ Potential extensions include:
 
 ## Project Status
 
-The framework is currently an ongoing personal project focused on developing a modular foundation for systematic trading research.
+This is an ongoing personal project focused on building a modular foundation for systematic trading research.
 
-<u>The project is intentionally implemented without relying on a dedicated quantitative trading/backtesting framework; the core backtesting, portfolio accounting, signal processing, performance metrics, and visualization logic are implemented directly in Python.</u>
+<u>The project was implemented from scratch without relying on a dedicated quantitative trading or backtesting framework.</u>
+
+The primary focus has been on designing the interaction between strategy definition, historical data processing, signal generation, portfolio execution, and performance evaluation rather than optimizing any particular trading strategy.
