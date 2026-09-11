@@ -54,7 +54,7 @@ Strategy = strategy(
 
 <u>Strategy logic is completely separated from portfolio execution, allowing new strategies to be created without modifying the backtesting engine.</u>
 
-The interface supports arbitrary user-defined calculations, making the framework independent of any particular trading strategy.
+The interface supports user-defined calculations, making the framework suitable for any trading strategy.
 
 ---
 
@@ -64,18 +64,17 @@ Many systematic trading strategies require historical observations before they c
 
 For example, a 200-day moving average requires 200 previous observations. A naive backtester either:
 
-* starts the calculation with missing values,
-* delays the backtest until the lookback period has passed, or
-* requires the user to manually download additional historical data.
+* starts the calculation with missing values, or
+* delays the backtest until the lookback period has passed
 
 <u>This framework separates the data required to calculate a strategy's indicators from the period over which the portfolio is actually backtested.</u>
 
-The runner automatically downloads additional historical data before the requested backtest start date:
+The runner downloads additional historical data before the requested backtest start date:
 
 ```python
 data_download_start_date = (
     pd.to_datetime(start_date)
-    - pd.Timedelta(days=data_before_benchmark) * 2
+    - pd.Timedelta(days = lookback_days) * 2
 )
 ```
 
@@ -119,8 +118,8 @@ For example, a strategy can compare the momentum of two assets and use the resul
 Strategy1 = multi_asset_startegy(
     "MSFT",
     values={
-        "AAPL_pct_change_60": lambda data: data["AAPL"]["Close"].pct_change(20),
-        "MSFT_pct_change_60": lambda data: data["MSFT"]["Close"].pct_change(20)
+        "AAPL_pct_change_60": lambda data: data["AAPL"]["Close"].pct_change(60),
+        "MSFT_pct_change_60": lambda data: data["MSFT"]["Close"].pct_change(60)
     },
     signals={
         "MSFT<AAPL_pctc60":
@@ -170,13 +169,13 @@ The `Backtester` class simulates portfolio execution while maintaining:
 
 For multiple assets, the initial capital is divided between the selected assets and the resulting daily portfolio values are aggregated into a total portfolio value series.
 
-<u>Portfolio execution is kept separate from signal generation, so the same execution engine can be reused across different strategies.</u>
+<u>Portfolio execution is kept separate from signal generation, so to keep with the spirit of modularity</u>
 
 ---
 
 ### 7. Benchmark Comparison
 
-<u>Every strategy can be evaluated against a separately constructed benchmark using the same backtesting infrastructure.</u>
+<u>Every strategy can be evaluated against a benchmark constructed using the same backtesting infrastructure.</u>
 
 The default benchmark is a buy-and-hold strategy:
 
@@ -241,7 +240,7 @@ Responsible for retrieving historical market data using `yfinance`.
 data_loader(symbols, start_date, end_date)
 ```
 
-The loader accepts either a single ticker or a list of tickers and returns the corresponding historical data.
+The loader accepts either a single ticker or a list of tickers and returns the corresponding historical data in an easily-digestible format.
 
 ---
 
@@ -259,7 +258,7 @@ It is responsible only for transforming market data into trading signals.
 
 ### `backtest_runner.py`
 
-Provides the high-level backtest workflow.
+Provides the high-level backtest workflow using a `run_the_backtester` master function.
 
 It coordinates:
 
@@ -342,7 +341,42 @@ backtesting-framework/
 
 ---
 
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/BarKob/backtesting-framework.git
+cd backtesting-framework
+```
+
+Create a virtual environment:
+
+```bash
+python -m venv .venv
+```
+
+Activate it on Windows:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Install the dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
 ## Examples
+
+In order to run any example strategy, follow the installation instructions and follow with:
+
+```bash
+python -m examples.STRATEGY_FILE_NAME
+```
 
 ### Moving Average Strategy
 
@@ -386,38 +420,9 @@ Demonstrates the portfolio's ability to handle multiple assets and aggregate the
 
 ---
 
-## Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/BarKob/backtesting-framework.git
-cd backtesting-framework
-```
-
-Create a virtual environment:
-
-```bash
-python -m venv .venv
-```
-
-Activate it on Windows:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-Install the dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
 ## Usage
 
-The simplest way to run the framework is through `main.py`.
+The simplest way to run the framework for user's research needs is through `main.py`.
 
 The main user-configurable parameters are:
 
@@ -427,6 +432,7 @@ start_date = ""           # "YYYY-MM-DD"
 end_date = ""             # "YYYY-MM-DD"
 benchmark = []            # str for a single asset, list of strings for multiple assets
 starting_capital = int    # starting capital
+lookback_days = int       # how far should the backtester go in order to account for rolling statistics
 ```
 
 A strategy is then created using the `strategy` or `multi_asset_startegy` class.
@@ -454,7 +460,9 @@ run_the_backtester(
     end_date,
     benchmark,
     starting_capital,
-    Strategy
+    Strategy,
+    Benchmark_Strategy,
+    lookback_days
 )
 ```
 
@@ -503,34 +511,6 @@ The visualization compares:
 <img src="images/Metrics comparison.png" alt="Strategy and benchmark metrics comparison" width="800">
 
 This provides a more meaningful evaluation of whether a strategy adds value relative to a passive alternative.
-
----
-
-## Design Principles
-
-### Modularity
-
-<u>Data loading, strategy logic, portfolio execution, performance metrics, and visualization are implemented as separate components.</u>
-
-### Strategy Independence
-
-<u>The backtesting engine does not contain strategy-specific trading logic. Strategies generate signals while the backtester handles execution.</u>
-
-### Separation of Information and Execution
-
-<u>Multi-asset strategies can use one set of assets as information sources while executing trades on another set of assets.</u>
-
-### Correct Historical Initialization
-
-<u>Strategies requiring historical observations can use data preceding the actual backtest period without artificially delaying portfolio execution.</u>
-
-### Composability
-
-<u>Multiple independently defined strategies can be combined into a single portfolio.</u>
-
-### Extensibility
-
-New strategies can be tested by defining new value calculations and signals without modifying the core portfolio engine.
 
 ---
 
@@ -588,3 +568,5 @@ This is an ongoing personal project focused on building a modular foundation for
 <u>The project was implemented from scratch without relying on a dedicated quantitative trading or backtesting framework.</u>
 
 The primary focus has been on designing the interaction between strategy definition, historical data processing, signal generation, portfolio execution, and performance evaluation rather than optimizing any particular trading strategy.
+
+Every problem encountered along the way has been tackled without relying on AI written code, as to maximize the learning aspect. Every line of code in this project is written by hand, and deeply understood by the author. 

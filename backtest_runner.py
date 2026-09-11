@@ -5,10 +5,10 @@ from metrics import Metrics
 from visual import visualise
 import pandas as pd
 
-def run_the_backtester(tickers: str | list, start_date: str, end_date: str, benchmark: str | list, starting_capital: int, Strategy: strategy | multi_asset_strategy | list, Benchmark_Strategy: strategy = strategy(values = {}, signals = {"buy&hold": lambda row: True}), data_before_benchmark: int = 0):
+def run_the_backtester(tickers: str | list, start_date: str, end_date: str, benchmark: str | list, starting_capital: int, Strategy: strategy | multi_asset_strategy | list, Benchmark_Strategy: strategy = strategy(values = {}, signals = {"buy&hold": lambda row: True}), lookback_days: int = 0):
 
     # Data processing, calculating signals based on quantitative data, preparing data for visualization, calculating metrics for startegy performance evaluation, visualization
-    data_download_start_date = pd.to_datetime(start_date) - pd.Timedelta(days = data_before_benchmark) * 2
+    data_download_start_date = pd.to_datetime(start_date) - pd.Timedelta(days = lookback_days) * 2
     
     Data = data_loader(tickers, data_download_start_date, end_date).load_data()
 
@@ -21,7 +21,7 @@ def run_the_backtester(tickers: str | list, start_date: str, end_date: str, benc
     else:
         Data_For_Backtesting = Strategy.calculate_signal(Data)
 
-    if data_before_benchmark > 0:
+    if lookback_days > 0:
         Data_For_Backtesting = {asset_name: data_for_asset.loc[start_date:] for asset_name, data_for_asset in Data_For_Backtesting.items()}
 
     Benchmark_Data = data_loader(benchmark, start_date, end_date).load_data()

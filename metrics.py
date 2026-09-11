@@ -18,7 +18,7 @@ class Metrics:
         total_return_pct = self.daily_portfolio_values.iloc[-1] / self.daily_portfolio_values.iloc[0] - 1
 
         returns_pct = self.daily_portfolio_values.pct_change().dropna()
-        volatility = returns_pct.std() * np.sqrt(len(returns_pct))
+        volatility = returns_pct.std() * np.sqrt(252)
 
         previous_peak = self.daily_portfolio_values.cummax()
         drawdown = self.daily_portfolio_values / previous_peak - 1
@@ -28,9 +28,9 @@ class Metrics:
         excess_returns = pd.Series(returns_pct) - self.rfr_with_portfolio_values["DGS3MO"]
         sharpe_ann = (excess_returns.mean() / returns_pct.std()) * (np.sqrt(252))
 
-        print(total_return_pct, volatility, max_drawdown, sharpe_ann)
         metrics = {"Total return":total_return_pct,  
                    "Volatility":volatility, 
                    "Maximum Drawdown":max_drawdown, 
                    "Sharpe ratio":sharpe_ann}
+        
         return metrics

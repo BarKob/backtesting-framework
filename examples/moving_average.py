@@ -16,4 +16,4 @@ Strategy = strategy(values = {
         "sma_200 < sma_50": lambda row: row["sma_200"] < row["sma_50"]
     })
 
-run_the_backtester(tickers, start_date, end_date, benchmark, starting_capital, Strategy)
+run_the_backtester(tickers, start_date, end_date, benchmark, starting_capital, Strategy, lookback_days = 200)
